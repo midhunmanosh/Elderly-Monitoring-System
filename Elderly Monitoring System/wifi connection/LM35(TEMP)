@@ -1,0 +1,51 @@
+#include <ESP8266WiFi.h>
+
+const char* ssid = "YOUR_SSID";
+const char* password = "YOUR_PASSWORD";
+
+const int lm35Pin = A0;  // Pin that the LM35 sensor is connected to
+
+void setup() {
+  Serial.begin(9600);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi connected");
+}
+
+void loop() {
+  float temperature = getTemperature();
+  sendIFTTTAlert(temperature);
+  delay(10000);  // Delay 10 seconds before sending next temperature reading
+}
+
+float getTemperature() {
+  int lm35Reading = analogRead(lm35Pin);
+  float voltage = lm35Reading * 3.3 / 1024;
+  float temperature = voltage / 0.01;
+  return temperature;
+}
+
+void sendIFTTTAlert(float temperature) {
+  // Replace YOUR_IFTTT_KEY with your personal IFTTT key
+  const char* host = "maker.ifttt.com";
+  const char* key = "YOUR_IFTTT_KEY";
+  const char* eventName = "temperature_reading";
+  String url = "/trigger/" + String(eventName) + "/with/key/" + String(key);
+
+  WiFiClient client;
+  if (client.connect(host, 80)) {
+    String body = "value1=" + String(temperature);
+    client.print(String("POST ") + url + " HTTP/1.1\r\n" +
+                 "Host: " + host + "\r\n" +
+                 "Content-Type: application/x-www-form-urlencoded\r\n" +
+                 "Content-Length: " + body.length() + "\r\n" +
+                 "Connection: close\r\n" +
+                 "\r\n" +
+                 body + "\r\n");
+    client.stop();
+  }
+}

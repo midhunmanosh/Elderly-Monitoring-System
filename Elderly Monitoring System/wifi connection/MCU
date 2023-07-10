@@ -1,0 +1,56 @@
+#include <Wire.h>
+#include <ESP8266WiFi.h>
+
+const char* ssid = "YOUR_SSID";
+const char* password = "YOUR_PASSWORD";
+
+const int lm35Pin = A0;  // Pin that the LM35 sensor is connected to
+const int max30100Address = 0x57;  // I2C address of the MAX30100 sensor
+const int mpu6050Address = 0x68;  // I2C address of the MPU6050 sensor
+
+int16_t ax, ay, az;  // Variables to store raw acceleration data
+
+void setup() {
+  Serial.begin(9600);
+  Wire.begin();
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi connected");
+}
+
+void loop() {
+  float temperature = getTemperature();
+  int heartRate = getHeartRate();
+  getAcceleration();
+  sendIFTTTAlert(temperature, heartRate, ax, ay, az);
+  delay(10000);  // Delay 10 seconds before sending next readings
+}
+
+float getTemperature() {
+  int lm35Reading = analogRead(lm35Pin);
+  float voltage = lm35Reading * 3.3 / 1024;
+  float temperature = voltage / 0.01;
+  return temperature;
+}
+
+int getHeartRate() {
+  Wire.beginTransmission(max30100Address);
+  Wire.write(0x02);  // Start at FIFO_WR_PTR register
+  Wire.endTransmission(false);
+  Wire.requestFrom(max30100Address, 1, true);  // Request 1 byte
+  int heartRate = Wire.read();  // Store heart rate value
+  return heartRate;
+}
+
+void getAcceleration() {
+  Wire.beginTransmission(mpu6050Address);
+  Wire.write(0x3B);  // Start at ACCEL_XOUT_H register
+  Wire.endTransmission(false);
+  Wire.requestFrom(mpu6050Address, 6, true);  // Request 6 bytes (2 bytes per axis)
+  ax = Wire.read() << 8 | Wire.read();  // Store x-axis values
+  ay = Wire.read() << 8 | Wire.read();  // Store y-axis values
+  az = Wire.read() << 8 | Wire.read();

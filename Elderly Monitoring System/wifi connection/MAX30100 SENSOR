@@ -1,0 +1,53 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+#include <Wire.h>
+#include "MAX30100_PulseOximeter.h"
+
+const char* ssid = "your_ssid";
+const char* password = "your_password";
+const char* ifttt_key = "your_ifttt_maker_key";
+
+MAX30100_PulseOximeter pox;
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi connected");
+
+  pox.begin();
+}
+
+void loop() {
+  float spO2;
+  float heartRate;
+  pox.update();
+  pox.getSpO2(&spO2);
+  pox.getHeartRate(&heartRate);
+
+  Serial.print("SpO2: ");
+  Serial.print(spO2);
+  Serial.print("%   ");
+  Serial.print("Heart Rate: ");
+  Serial.print(heartRate);
+  Serial.println(" bpm");
+
+  if (spO2 < 90 || heartRate > 120) {
+    sendIFTTTAlert(spO2, heartRate);
+  }
+  delay(1000);
+}
+
+void sendIFTTTAlert(float spO2, float heartRate) {
+  HTTPClient http;
+  String url = "https://maker.ifttt.com/trigger/alert/with/key/" + String(ifttt_key);
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+  String json = "{\"value1\":\"" + String(spO2) + "\",\"value2\":\"" + String(heartRate) + "\"}";
+  http.POST(json);
+  http.end();
+}
